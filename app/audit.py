@@ -22,3 +22,12 @@ def get_log_entries(limit=50):
     
     # Return most recent first, limited to `limit` entries
     return entries[-limit:][::-1]
+
+def find_entry_by_content_id(content_id):
+    """Find the MOST RECENT log entry for a specific content_id."""
+    entries = get_log_entries(limit=1000)
+    # Reverse to get most recent first
+    for entry in reversed(entries):
+        if entry.get('content_id') == content_id:
+            return entry
+    return None
