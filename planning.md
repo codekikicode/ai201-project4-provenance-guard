@@ -148,7 +148,7 @@ A score of 0.5 is the calibrated midpoint where the sigmoid outputs exactly 0.5 
 
 ### Testing score meaningfulness
 
-Verification plan: Test with 20 known-AI samples and 20 known-human samples. Compute score distributions. If AI samples cluster below 0.35 and human samples above 0.65 with minimal overlap in the 0.35–0.65 band, the scoring is meaningful. If scores are uniformly distributed, the signals are not discriminating.
+Verification plan: Test with 20 known-AI samples and 20 known-human samples. Compute score distributions. If AI samples cluster below 0.35 and human samples above 0.65 with minimal overlap in the 0.35 – 0.65 band, the scoring is meaningful. If scores are uniformly distributed, the signals are not discriminating.
 
 ---
 
@@ -183,11 +183,9 @@ Verification plan: Test with 20 known-AI samples and 20 known-human samples. Com
 
 ## 4. Appeals Workflow
 
-### Who can submit an appeal?
+**Who can submit an appeal?:** Any creator whose content has been submitted through the system and received an unfavorable classification (AI, Human, or Uncertain). The appeal is tied to the original submission ID.
 
-Any creator whose content has been submitted through the system and received a classification (AI, Human, or Uncertain). The appeal is tied to the original submission ID.
-
-### What information does the creator provide?
+**What information does the creator provide?:**
 
 - **Original submission ID** (auto-populated from the content they are appealing)
 
@@ -207,7 +205,7 @@ For example: "I wrote this poem at 3am after a breakup. The repetition is intent
 
 4. **Human reviewer queue:** Appeal enters a queue with original submission data, scores, signal breakdowns, and creator statement visible.
 
-### What does a human reviewer see?
+**What does a User/Reviewer see?**
 
 A dashboard entry showing:
 - Original text
@@ -217,37 +215,55 @@ A dashboard entry showing:
 - Creator's appeal statement
 - One - click actions: `Confirm Classification` or `Override to Human` / `Override to AI` / `Override to Uncertain`
 
-### Automated re-classification?
-
-No. This system does not implement automated re-classification. The human reviewer makes the final call. The audit log records the override and the reviewer's justification. This keeps the system honest about its own limitations.
+**Automated re-classification?:** No. This system does not implement automated re-classification. The reviewer and/or moderator makes the final call. The audit log records the override and the reviewer's justification. This keeps the system honest about its own limitations.
 
 ---
 
-## 5. Anticipated Edge Cases
+## 5. Anticipated Edge Cases (Validated)
 
 ### Edge Case 1: Deliberately Minimalist Human Poetry
 
-**Scenario:** A human poet submits a 40 - word poem with heavy anaphora, simple vocabulary, and short lines. E.g., "I am here. I am there. I am nowhere. I am everywhere."
+**Scenario:** A human poet submits a 40-word poem with heavy anaphora, simple vocabulary, and short lines. E.g., "I am here. I am there. I am nowhere. I am everywhere."
 
-**Why the system handles it poorly:** Both signals may fire false positives. Perplexity/burstiness sees low variance (short, repetitive lines). Semantic fingerprint sees high repetition (anaphora). The raw combined score may drop into the 0.20–0.30 range, triggering a high-confidence AI label.
+**Expected behavior:** Both signals may fire false positives. Perplexity/burstiness sees low variance (short, repetitive lines). Semantic fingerprint sees high repetition (anaphora). The raw combined score may drop into the 0.20–0.30 range, triggering a high-confidence AI label.
 
-**Mitigation in design:** The wide uncertain band (0.35 – 0.65) catches some of these, but extreme minimalism may still fall below 0.35. The appeals workflow is the primary safety net -- the creator can explain the intentional repetition. Future improvement: add a third signal for stylistic intent detection (e.g., recognizing poetic devices).
+**Mitigation in design:** The wide uncertain band (0.35–0.65) catches some of these, but extreme minimalism may still fall below 0.35. The appeals workflow is the primary safety net — the creator can explain the intentional repetition. Future improvement: add a third signal for stylistic intent detection (e.g., recognizing poetic devices).
 
 ### Edge Case 2: AI Text Heavily Edited by a Human
 
 **Scenario:** A creator uses AI to generate a first draft, then heavily edits it -- changing 60% of sentences, adding personal anecdotes, restructuring paragraphs.
 
-**Why the system handles it poorly:** The text is genuinely hybrid. Signal 1 may detect human burstiness in the edited sections, but Signal 2 may still find AI template residue in the unedited 40%. The scores may conflict, landing in the uncertain zone (0.40–0.60). This is actually correct behavior -- the system *should* be uncertain about hybrid content -- but creators may find "uncertain" stigmatizing when they did substantial human work.
+**Expected behavior:** The text is genuinely hybrid. Signal 1 may detect human burstiness in the edited sections, but Signal 2 may still find AI template residue in the unedited 40%. The scores may conflict, landing in the uncertain zone (0.40–0.60). This is actually correct behavior — the system *should* be uncertain about hybrid content — but creators may find "uncertain" stigmatizing when they did substantial human work.
 
 **Mitigation in design:** The uncertain label explicitly says "mixed signals" rather than "probably AI." The appeals workflow allows creators to argue for human override. Future improvement: detect edit boundaries (requires diff against known AI outputs, which is not in scope).
 
 ### Edge Case 3: Adversarial Flooding Attack
 
-**Scenario:** A malicious actor submits thousands of AI - generated pieces with adversarial perturbations designed to spoof human signals (e.g., injecting random typos, forcing sentence length variance).
+**Scenario:** A malicious actor submits thousands of AI-generated pieces with adversarial perturbations designed to spoof human signals (e.g., injecting random typos, forcing sentence length variance).
 
-**Why the system handles it poorly:** Rate limiting prevents volume, but sophisticated adversarial text may bypass both signals if the perturbations are carefully calibrated. The system has no adversarial training data.
+**Expected behavior:** Rate limiting prevents volume, but sophisticated adversarial text may bypass both signals if the perturbations are carefully calibrated. The system has no adversarial training data.
 
-**Mitigation in design:** Rate limiting (see below) caps submission volume per IP/API key. The audit log enables post - hoc forensic analysis. The system does not claim perfection -- the README and labels explicitly state this is a best - effort detection system.
+**Mitigation in design:** Rate limiting (see below) caps submission volume per IP/API key. The audit log enables post-hoc forensic analysis. The system does not claim perfection — the README and labels explicitly state this is a best-effort detection system.
+
+### Edge Case 4: Lightly Edited AI Text (Validated Limitation)
+
+**Scenario:** A creator uses AI to generate a first draft, then lightly edits it — adding personal voice markers, restructuring a few sentences, but retaining the AI's core argument and flow. Tested with: "I've been thinking a lot about remote work lately. There are genuine tradeoffs — flexibility and no commute on one side, isolation and blurred work-life boundaries on the other. Studies show productivity varies widely by individual and role type."
+
+**Actual result:** Both signals scored the text as human-like (LLM 0.75, stylometric 0.669). Combined confidence: 0.783, attribution: `likely_human`. The editing removed AI transition templates and added first-person markers that triggered human signals.
+
+**Why the system handles it poorly:** The current signals are designed to detect *unmodified* AI output. Once a text is edited beyond surface-level changes, the stylistic fingerprints of the original AI generation are overwritten. The system has no mechanism to detect edit boundaries or compare against known AI outputs.
+
+**Why this is acceptable:** The spec explicitly states that "perfect AI detection is an unsolved problem." A lightly edited AI text that reads as human *should* be hard to detect — the system is not intended to police creativity, only to protect attribution. The `uncertain` label exists for exactly this ambiguity; in this case, the signals did not disagree strongly enough (diff = 0.081) to trigger it.
+
+**Mitigation in design:** The appeals workflow allows creators to contest any classification. If an AI-generated text is mislabeled as human, the original creator of the AI output has no standing to appeal (they did not submit the content). If a human editor is falsely accused of using AI, they can appeal with their revision history. Future improvement: diff-based analysis comparing drafts against known AI outputs (requires access to original AI generation, which is not in scope).
+
+### Edge Case 5: Non-Native English Speaker (ESL)
+
+**Scenario:** A non-native English speaker submits a personal essay about their hometown. Their writing uses formal transitions, consistent sentence length, and simpler vocabulary than a native speaker.
+
+**Expected behavior:** The stylometric signal may score this as AI-like due to low sentence variance and standardized transitions. The LLM signal may partially compensate by detecting personal cultural specificity, but the combined score may land in the uncertain or even likely_ai zone.
+
+**Mitigation in design:** The appeals workflow is the primary safety net — the creator can explain their ESL background. Future improvement: add language proficiency detection or per-language stylometric baselines.
 
 ---
 
@@ -278,7 +294,8 @@ A creator submits `POST /appeal` with the original submission ID and their state
 
 ## AI Tool Plan
 
-### M3: Submission Endpoint + First Signal
+***M3: Submission Endpoint + First Signal**
+
 **Spec sections to provide:**
 - Detection Signals section (Signal 1 description, output format, blind spot)
 - Architecture diagram (submission flow)
@@ -295,7 +312,10 @@ A creator submits `POST /appeal` with the original submission ID and their state
 - Signal 1 should score AI text < 0.4 and human text > 0.6 in at least 7/10 cases.
 - If not, adjust the variance calculation before wiring into the endpoint.
 
-### M4: Second Signal + Confidence Scoring
+---
+
+**M4: Second Signal + Confidence Scoring**
+
 **Spec sections to provide:**
 - Detection Signals section (Signal 2 description, output format, blind spot)
 - Uncertainty Representation section (combination strategy, calibration formula, thresholds)
@@ -312,7 +332,10 @@ A creator submits `POST /appeal` with the original submission ID and their state
 - Check that a 0.51 and 0.95 produce different label categories (both should not be "uncertain" or both "human").
 - If scores are binary-clumped around 0.5, adjust sigmoid steepness (k) or harmonic mean weights.
 
-### M5: Production Layer (Labels + Appeals + Audit Log)
+---
+
+**M5: Production Layer (Labels + Appeals + Audit Log)**
+
 **Spec sections to provide:**
 - Transparency Label Design section (all three verbatim texts)
 - Appeals Workflow section (status changes, reviewer view, data model)
@@ -334,20 +357,18 @@ A creator submits `POST /appeal` with the original submission ID and their state
 
 ## Rate Limiting Configuration
 
-**Endpoint:** `POST /submit`
-
 **Limits chosen:**
 - **100 requests per 15 minutes per IP address**
 - **500 requests per hour per API key** (for authenticated platform integrations)
 
 **Reasoning:**
-A typical human creator on a writing platform might submit 1–3 pieces per day for analysis. 100 requests per 15 minutes allows legitimate bulk operations (e.g., a platform migrating a back catalog) while preventing adversarial flooding. The API key limit is higher for platform integrations that serve many users. An adversary trying to flood the system with AI-generated content to poison or overwhelm it would hit the IP limit quickly. The 15-minute window is short enough to not frustrate legitimate users but long enough to require an adversary to distribute across many IPs to be effective.
+A typical content creator on a writing platform might submit 1–3 pieces per day for analysis. 100 requests per 15 minutes allows legitimate bulk operations (e.g., a platform migrating a back catalog) while preventing adversarial flooding. The API key limit is higher for platform integrations that serve many users. An malicious actor trying to flood the system with AI-generated content to poison or overwhelm it would hit the IP limit quickly. The 15-minute window is short enough to not frustrate legitimate users but long enough to require bad actors to distribute across many IPs to be effective.
 
 ---
 
 ## Audit Log Sample
 
-```json
+   json
 [
   {
     "timestamp": "2026-06-28T14:32:01Z",
@@ -381,9 +402,47 @@ A typical human creator on a writing platform might submit 1–3 pieces per day 
     "signal2_score": 0.58,
     "combined_confidence": 0.52,
     "label_category": "uncertain",
-    "label_text": "We cannot confidently determine whether this content was written by a human or generated with AI. The text shows mixed signals — some patterns suggest human authorship, others suggest AI assistance. The creator may submit an appeal if they believe this assessment is incorrect.",
+    "label_text": "We cannot confidently determine whether this content was written by a human or generated with AI. The text shows mixed signals — some patterns suggest human authorship, others suggest AI assistance. The user may submit an appeal if they believe this assessment is incorrect.",
     "appeal_status": "under_review",
     "appeal_id": "app_001",
     "client_ip": "192.168.1.1"
   }
 ]
+
+---
+
+## Stretch Feature: Provenance Certificate
+
+**Provenance Certificate**
+A "verified human" credential that creators can earn through an additional verification step. Once certified, their content receives a distinct label indicating the creator has been verified, shifting the burden of proof from the system to the creator.
+
+### Why This Matters
+The core limitation of Provenance Guard is that it cannot reliably detect lightly edited AI text. The certificate addresses this by having creators prove their identity once, then trusting them within a time window. This mirrors real-world approaches (Twitter/X verification, GitHub commit signing).
+
+### Verification Process
+
+1. **Prompted writing sample:** User submits a unique, prompted piece of text (e.g., "Write about your most embarrassing childhood memory in exactly 200 words"). The prompt is generated by the system and cannot be predicted in advance.
+
+2. **Stylometric fingerprint matching:** The system compares the submission against the creator's historical submissions using the same stylometric metrics (sentence variance, TTR, punctuation patterns, human markers). A match score &gt; 0.85 indicates consistent personal voice.
+
+3. **Personal detail verification:** The system checks for specific, non-generic details (names, places, dates, sensory descriptions) that are hard for AI to fabricate convincingly without hallucination.
+
+4. **Certificate issued:** If both checks pass, the creator is marked as `verified_human` with a 90-day expiration.
+
+---
+
+### Data Model
+
+   json
+{
+  "certificate_id": "cert_abc123",
+  "creator_id": "user_456",
+  "verified_at": "2026-06-29T18:00:00Z",
+  "expires_at": "2026-09-27T18:00:00Z",
+  "verification_prompt": "Write about your most embarrassing childhood memory in exactly 200 words",
+  "stylometric_match_score": 0.91,
+  "personal_details_found": 4,
+  "status": "active"
+}
+
+---
