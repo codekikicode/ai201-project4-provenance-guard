@@ -1,7 +1,8 @@
 import json
 import os
 
-LOG_FILE = os.path.join(os.path.dirname(__file__), '..', 'audit_log.jsonl')
+# Use absolute path based on this file's location
+LOG_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'audit_log.jsonl'))
 
 def add_log_entry(entry):
     """Append a structured entry to the audit log (JSON Lines format)."""
@@ -20,14 +21,13 @@ def get_log_entries(limit=50):
             if line:
                 entries.append(json.loads(line))
     
-    # Return most recent first, limited to `limit` entries
+    # Return most recent first
     return entries[-limit:][::-1]
 
 def find_entry_by_content_id(content_id):
     """Find the MOST RECENT log entry for a specific content_id."""
     entries = get_log_entries(limit=1000)
-    # Reverse to get most recent first
-    for entry in reversed(entries):
+    for entry in entries:
         if entry.get('content_id') == content_id:
             return entry
     return None
